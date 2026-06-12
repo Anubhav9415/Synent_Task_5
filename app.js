@@ -584,6 +584,7 @@ class AppController {
         this.timerPauseBtn = document.getElementById('timerPauseBtn');
         this.timerResetBtn = document.getElementById('timerResetBtn');
         this.timerPulseDot = document.getElementById('timerPulseDot');
+        this.recordDemoBtn = document.getElementById('recordDemoBtn');
         
         // Initialize Theme UI
         const currentTheme = localStorage.getItem('focusflow_theme') || 'dark';
@@ -850,6 +851,12 @@ class AppController {
                 this.render(); // Reset DOM back to correct sorting order
             }
         });
+
+        if (this.recordDemoBtn) {
+            this.recordDemoBtn.addEventListener('click', () => {
+                this.startAutoDemo();
+            });
+        }
     }
 
     openCategoryModal() {
@@ -1249,6 +1256,130 @@ class AppController {
         const div = document.createElement('div');
         div.textContent = str;
         return div.innerHTML;
+    }
+
+    async startAutoDemo() {
+        try {
+            // 1. Prompt user context
+            this.showToast('Please select "This Tab" in the following popup to record properly!', 'warning');
+            
+            // 2. Request tab capture
+            const stream = await navigator.mediaDevices.getDisplayMedia({
+                video: {
+                    displaySurface: "browser",
+                    width: 1280,
+                    height: 720,
+                    frameRate: 30
+                },
+                audio: true
+            });
+
+            const chunks = [];
+            
+            // Check supported WebM codecs
+            let options = { mimeType: 'video/webm;codecs=vp9' };
+            if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+                options = { mimeType: 'video/webm' };
+            }
+            
+            const recorder = new MediaRecorder(stream, options);
+
+            recorder.ondataavailable = e => {
+                if (e.data && e.data.size > 0) chunks.push(e.data);
+            };
+
+            recorder.onstop = () => {
+                const blob = new Blob(chunks, { type: 'video/webm' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'focusflow-live-demo.webm';
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                URL.revokeObjectURL(url);
+                
+                // Stop all tracks in screen recording stream
+                stream.getTracks().forEach(track => track.stop());
+                
+                this.showToast('Demo recording finished and downloaded as focusflow-live-demo.webm!', 'success');
+            };
+
+            // Start recording
+            recorder.start();
+            this.showToast('Recording started! Performing automated demo...', 'success');
+
+            // Automation Timeline (Total ~18 seconds)
+            
+            // Step 1: Open details drawer and add a High Priority task
+            setTimeout(() => {
+                this.toggleDetailsBtn.click();
+                this.taskTitleInput.value = '🥇 Complete Synent Task 5';
+                this.taskDescInput.value = 'Deliver the world-class To-Do Web App project';
+                // Set due date to today + 2 hours
+                const date = new Date();
+                date.setHours(date.getHours() + 2);
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const day = String(date.getDate()).padStart(2, '0');
+                const hours = String(date.getHours()).padStart(2, '0');
+                const minutes = String(date.getMinutes()).padStart(2, '0');
+                this.taskDueDate.value = `${year}-${month}-${day}T${hours}:${minutes}`;
+                
+                document.getElementById('prioHigh').checked = true;
+            }, 1000);
+
+            // Submit the first task
+            setTimeout(() => {
+                // Trigger form submit
+                this.taskForm.requestSubmit();
+            }, 3500);
+
+            // Step 2: Add a second Low Priority task quickly
+            setTimeout(() => {
+                this.taskTitleInput.value = '☕ Take a short break';
+                document.getElementById('prioLow').checked = true;
+                this.taskForm.requestSubmit();
+            }, 5500);
+
+            // Step 3: Check/Complete the first task (Chime chime + Confetti explosion!)
+            setTimeout(() => {
+                const firstCheckbox = this.taskList.querySelector('.task-checkbox-input');
+                if (firstCheckbox) {
+                    firstCheckbox.click();
+                }
+            }, 8500);
+
+            // Step 4: Toggle theme to Light Mode
+            setTimeout(() => {
+                this.themeToggle.click();
+            }, 11500);
+
+            // Step 5: Toggle theme back to Dark Mode
+            setTimeout(() => {
+                this.themeToggle.click();
+            }, 13500);
+
+            // Step 6: Bind the remaining task to Pomodoro Focus Space and start the timer
+            setTimeout(() => {
+                const focusBtn = this.taskList.querySelector('.focus-task-btn');
+                if (focusBtn) focusBtn.click();
+            }, 15000);
+
+            setTimeout(() => {
+                this.timerStartBtn.click();
+            }, 16500);
+
+            // Step 7: Finish recording
+            setTimeout(() => {
+                this.timerPauseBtn.click(); // Stop timer ticks
+                recorder.stop();
+            }, 18000);
+
+        } catch (err) {
+            console.error('Error starting demo capture:', err);
+            this.showToast('Recording cancelled or failed', 'danger');
+        }
     }
 }
 
